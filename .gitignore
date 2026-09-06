@@ -1,0 +1,32 @@
+# Local datasets and expensive feature caches
+/data/
+/features/
+
+# Detailed and historical experiment artifacts; keep compact final summaries
+/outputs/*
+!/outputs/README.md
+!/outputs/generalization/
+/outputs/generalization/*
+!/outputs/generalization/summaries/
+!/outputs/generalization/summaries/**
+
+# Validation-only and temporary files
+/tests/
+/tmp/
+/check_feature_dim.py
+
+# Python and tool caches
+__pycache__/
+*.py[cod]
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local environments and editor state
+.venv/
+venv/
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

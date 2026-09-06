@@ -1,0 +1,21 @@
+{
+  "source_repository": "https://github.com/UCSC-REAL/SimiFeat",
+  "source_files_sha256": {
+    "main_fast.py": "21bade608456bed66aa6ff2f0aedd8965e33407069b89e4245ab50ea0a10896c",
+    "hoc.py": "9ab305663fe847e4c31c00a8e209d87120db84adaf029d534f0970cc0118ec9e",
+    "utils.py": "42885945fbe4295fd4e455f3b2b6fa5b639cd81648e633a4f532635f3417b9a1"
+  },
+  "license": "CC BY-NC 4.0",
+  "protocol": "simifeat_fixed_features_k10_m21_v1",
+  "augmentation": false,
+  "feature_views": 1,
+  "k": 10,
+  "rounds": 21,
+  "hoc_trials": 10,
+  "hoc_sample_size": 15000,
+  "hoc_first_steps": 400,
+  "hoc_warm_steps": 20,
+  "sampling_seed": "seed",
+  "jitter_seed": "seed+10000",
+  "description": "Fixed-feature adaptation; identical cached timm ViT-B/16 features and actual noisy labels from current Global-Local GMM partitions."
+}
