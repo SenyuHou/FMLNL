@@ -7,6 +7,7 @@ import torch
 import torch.nn.functional as F
 from sklearn.metrics import f1_score
 from torch import nn
+from tqdm import tqdm
 
 from lnl_foundation.partition.global_local_gmm import CLEAN, HARD, NOISY
 from lnl_foundation.utils import set_seed
@@ -110,9 +111,12 @@ def train_robust_linear_probe(
     confidence = confidence.to(device)
     test_features = test_features.to(device)
 
-    for cpu_order in epoch_orders:
+    progress = tqdm(epoch_orders, desc=f"Linear probe seed={seed}", unit="epoch", dynamic_ncols=True)
+    for cpu_order in progress:
         classifier.train()
         order = cpu_order.to(device)
+        epoch_loss = 0.0
+        num_batches = 0
         for start in range(0, len(order), config.batch_size):
             index = order[start : start + config.batch_size]
             logits = classifier(train_features[index])
@@ -126,6 +130,9 @@ def train_robust_linear_probe(
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
             optimizer.step()
+            epoch_loss += loss.item()
+            num_batches += 1
+        progress.set_postfix(loss=f"{epoch_loss / num_batches:.4f}")
 
     classifier.eval()
     predictions = []
