@@ -1,10 +1,11 @@
 # Frozen Features + Global-Local GMM
 
-The experiment has two steps: extract frozen pretrained ViT features, then
-partition CIFAR training samples into Clean (0), Hard (1), and Noisy (2).
+The pipeline has three steps: extract frozen pretrained ViT features, partition
+CIFAR training samples into Clean (0), Hard (1), and Noisy (2), then train the
+fixed robust linear probe.
 The partitioner only consumes features and noisy labels. True labels are used
 to generate benchmark noise and evaluate noisy-label detection, not to fit GMMs.
-There is no classifier training, OOF reference model, or hardness oracle.
+There is no OOF reference model or hardness oracle.
 
 The repository intentionally excludes CIFAR data, extracted feature caches,
 per-sample partitions, HOC traces, historical outputs, and validation-only
@@ -19,16 +20,21 @@ From the FMLNL directory in PowerShell:
 ```powershell
 conda activate fmlnl
 
-# CIFAR-10: extract once, then run all four settings with seeds 1, 2, 3.
-python scripts/extract_features.py --dataset cifar10
+# CIFAR-10: extract train/test once, then run all four settings with seeds 1, 2, 3.
+python scripts/extract_features.py --dataset cifar10 --splits train test
 python scripts/run_partition_generalization.py --dataset cifar10
 
 # CIFAR-100: run separately; Human defaults to human_noisy_label.
-python scripts/extract_features.py --dataset cifar100
+python scripts/extract_features.py --dataset cifar100 --splits train test
 python scripts/run_partition_generalization.py --dataset cifar100
 
 # Rebuild summaries for both datasets without running experiments.
 python scripts/run_partition_generalization.py --summarize_only
+
+# After train and test features and first-stage partitions exist, train the
+# fixed Clean-CE + Hard-GCE + Noisy-Prototype-SoftCE linear probe.
+python scripts/train_stage2.py --dataset cifar10
+python scripts/train_stage2.py --dataset cifar100
 ```
 
 Existing `features/<dataset>/vit_b16/train_l2.pt` caches are validated and reused
@@ -122,6 +128,30 @@ The existing median fallback for small/degenerate ambiguous subsets is retained
 and recorded in the metrics. Hard is a predicted reliability group, not a
 ground-truth hard-clean label. GMM uses 10 initializations and the run seed.
 
+## Fixed Stage-2 Training
+
+The final second-stage method freezes the backbone and trains only
+`nn.Linear(feature_dim, num_classes)`. Feature dimension is read from the cache.
+It uses one fixed loss design for every dataset and noise setting:
+
+- Clean: cross entropy with the current noisy label.
+- Hard: generalized cross entropy with fixed `q=0.7` and the current noisy label.
+- Noisy: entropy-confidence-weighted soft cross entropy against class-prototype
+  targets. Prototypes use only predicted Clean samples grouped by noisy label;
+  prototype temperature is fixed at `0.1`.
+
+The optimizer is AdamW with learning rate `1e-3`, weight decay `1e-4`, batch
+size 256, and 50 epochs. Seeds default to `1, 2, 3`. Human labels and their
+first-stage partition are fixed across classifier seeds; synthetic settings use
+the matching seed's saved labels and partition. Ground-truth training labels are
+never read by the stage-2 trainer. Official clean test labels are used only for
+Accuracy and Macro-F1.
+
+Stage-2 results are written locally under
+`outputs/stage2/<backbone>/<dataset>/`. Existing runs are skipped unless
+`--force` is provided. Detailed training outputs are intentionally excluded
+from version control.
+
 ## Results
 
 Each run writes only `metrics.json` and `partition.csv` under:
@@ -205,9 +235,10 @@ feature caches are retained in their original locations.
 
 ## Files
 
-There are two main experiment scripts plus `scripts/run_simifeat.py` for the
-fixed-feature baseline comparison. See `docs/simifeat/REPRODUCTION.md` for its
-protocol and commands. The package contains the frozen
-backbone, CIFAR loader, noise generation, feature cache/extraction, GMM and
-configuration utilities. `environment.yml` defines the existing `fmlnl` conda
-environment; no additional dependencies are needed for this consolidation.
+The formal pipeline uses `scripts/extract_features.py`,
+`scripts/run_partition_generalization.py`, and `scripts/train_stage2.py`.
+`scripts/run_simifeat.py` remains the fixed-feature baseline comparison; see
+`docs/simifeat/REPRODUCTION.md`. The package contains the frozen backbone,
+CIFAR loader, noise generation, feature cache/extraction, GMM, fixed robust
+linear probe, and configuration utilities. Diagnostic scripts and outputs are
+kept only in the ignored local `history/` directory.

@@ -13,6 +13,7 @@
 # Validation-only and temporary files
 /tests/
 /tmp/
+/history/
 /check_feature_dim.py
 
 # Python and tool caches
