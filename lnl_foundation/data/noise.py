@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 import torch
@@ -68,7 +69,7 @@ def generate_instance_noise_labels(
     return np.asarray([np.random.choice(num_classes, p=p) for p in probs], dtype=np.int64)
 
 
-def human_noise_key(dataset: str, noise_type: str | None = None) -> str:
+def human_noise_key(dataset: str, noise_type: Optional[str] = None) -> str:
     name = noise_type or ("human_worse_label" if dataset == "cifar10" else "human_noisy_label")
     if name not in HUMAN_CHOICES:
         raise ValueError(f"Unknown human noise option: {name}")
