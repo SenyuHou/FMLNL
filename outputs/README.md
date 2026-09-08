@@ -1,9 +1,19 @@
 # Output layout
 
-`generalization/` contains the active `tau_g=0.8`, `tau_l=0.5`, `k=20`
-experiments. The Git repository tracks only `generalization/summaries/`.
-Detailed per-sample runs and `history/` remain local and are intentionally
-ignored because they are large or superseded.
+The repository uses an explicit result whitelist. New compact results from a
+local machine or server are expected to appear in Git and should be committed.
+Large intermediate artifacts remain local even when they are written below
+`outputs/`.
+
+Tracked formal results:
+
+- `generalization/summaries/**`: aggregate first-stage GMM and SimiFeat tables.
+- `stage2/**/runs.csv`: final robust linear-probe metrics for each seed.
+- `stage2/**/summary.csv`: final robust linear-probe mean/std tables.
+
+Ignored artifacts include per-sample `partition.csv`, detailed first-stage run
+directories, diagnostic experiments, logs, feature caches, and historical
+outputs. Do not force-add these ignored files.
 
 ```text
 generalization/
@@ -18,9 +28,19 @@ generalization/
     comparison_summary.csv   # GMM + SimiFeat mean/std
     comparison_f1.csv        # GMM + SimiFeat eight-setting F1 table
   summaries/backbone_comparison_f1.csv  # all completed backbones
+
+stage2/<backbone>/<dataset>/
+  runs.csv                 # fixed CE-GCE-SoftCE metrics for each seed
+  summary.csv              # fixed CE-GCE-SoftCE mean/std
 ```
 
 Active backbone directory names are canonical: `vit_b16_imagenet`,
 `vit_l16_imagenet`, `clip_vit_b16`, `clip_vit_l14`, and `dinov2_vit_b14`.
 The dated directory `history/generalization_pre_consolidation_2026-09-07/`
 preserves the old `tau_l=0.8` runs and ambiguous duplicate summaries.
+
+When a new backbone finishes, files such as
+`generalization/summaries/dinov2_vit_b14/...` show as untracked (`U`) because
+they are important results selected for synchronization. Files under
+`generalization/cifar10/` or `generalization/cifar100/` stay ignored because
+they contain the much larger per-sample partitions.

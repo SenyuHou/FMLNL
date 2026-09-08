@@ -2,19 +2,31 @@
 /data/
 /features/
 
-# Detailed and historical experiment artifacts; keep compact final summaries
+# Experiment outputs: ignore by default, then whitelist compact formal results
 /outputs/*
 !/outputs/README.md
+
+# Stage 1: sync only aggregate Global-Local GMM/SimiFeat tables
 !/outputs/generalization/
 /outputs/generalization/*
 !/outputs/generalization/summaries/
 !/outputs/generalization/summaries/**
 
+# Stage 2: sync per-seed metrics and aggregate metrics, never future large artifacts
+!/outputs/stage2/
+/outputs/stage2/**
+!/outputs/stage2/**/
+!/outputs/stage2/**/runs.csv
+!/outputs/stage2/**/summary.csv
+
 # Validation-only and temporary files
 /tests/
 /tmp/
 /history/
+/logs/
 /check_feature_dim.py
+*.log
+nohup.out
 
 # Python and tool caches
 __pycache__/
