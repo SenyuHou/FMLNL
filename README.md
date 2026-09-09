@@ -149,8 +149,10 @@ Accuracy and Macro-F1.
 
 Stage-2 results are written locally under
 `outputs/stage2/<backbone>/<dataset>/`. Existing runs are skipped unless
-`--force` is provided. Detailed training outputs are intentionally excluded
-from version control.
+`--force` is provided. After each run, the five-backbone Accuracy and Macro-F1
+mean/std table is refreshed at
+`outputs/stage2/backbone_comparison/summary.csv`. Detailed training outputs are
+intentionally excluded from version control.
 
 ## Results
 

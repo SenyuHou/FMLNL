@@ -1,0 +1,21 @@
+Backbone,Metric,Statistic,CIFAR10-Human,CIFAR10-Symm0.6,CIFAR10-Pairflip0.3,CIFAR10-Inst0.4,CIFAR100-Human,CIFAR100-Symm0.6,CIFAR100-Pairflip0.3,CIFAR100-Inst0.4
+clip_vit_b16,Accuracy,Mean (%),93.31,93.83,93.61,94.01,72.22,76.69,75.0,77.95
+clip_vit_b16,Accuracy,Std (pp),0.01,0.12,0.04,0.18,0.1,0.04,0.21,0.08
+clip_vit_b16,Macro-F1,Mean (%),93.31,93.84,93.62,94.02,71.39,76.59,74.93,77.93
+clip_vit_b16,Macro-F1,Std (pp),0.01,0.12,0.03,0.17,0.11,0.05,0.23,0.12
+clip_vit_l14,Accuracy,Mean (%),96.89,97.33,97.23,97.43,80.02,84.19,83.21,85.27
+clip_vit_l14,Accuracy,Std (pp),0.04,0.09,0.09,0.04,0.06,0.07,0.16,0.12
+clip_vit_l14,Macro-F1,Mean (%),96.88,97.33,97.23,97.43,79.32,84.17,83.27,85.3
+clip_vit_l14,Macro-F1,Std (pp),0.04,0.09,0.09,0.04,0.07,0.09,0.17,0.11
+dinov2_vit_b14,Accuracy,Mean (%),97.72,98.49,98.63,98.55,84.69,89.74,89.8,90.63
+dinov2_vit_b14,Accuracy,Std (pp),0.03,0.02,0.06,0.07,0.02,0.1,0.22,0.19
+dinov2_vit_b14,Macro-F1,Mean (%),97.71,98.49,98.63,98.55,84.26,89.74,89.76,90.63
+dinov2_vit_b14,Macro-F1,Std (pp),0.03,0.02,0.06,0.07,0.02,0.08,0.22,0.2
+vit_b16_imagenet,Accuracy,Mean (%),92.36,93.47,93.2,93.56,73.93,78.62,78.37,80.1
+vit_b16_imagenet,Accuracy,Std (pp),0.06,0.04,0.07,0.22,0.07,0.13,0.22,0.23
+vit_b16_imagenet,Macro-F1,Mean (%),92.38,93.49,93.24,93.58,73.51,78.65,78.43,80.14
+vit_b16_imagenet,Macro-F1,Std (pp),0.07,0.03,0.07,0.21,0.08,0.1,0.23,0.24
+vit_l16_imagenet,Accuracy,Mean (%),97.56,98.65,98.78,98.76,86.08,90.32,90.03,91.2
+vit_l16_imagenet,Accuracy,Std (pp),0.02,0.02,0.04,0.03,0.15,0.26,0.13,0.05
+vit_l16_imagenet,Macro-F1,Mean (%),97.55,98.64,98.78,98.76,85.88,90.33,90.04,91.22
+vit_l16_imagenet,Macro-F1,Std (pp),0.02,0.02,0.04,0.03,0.15,0.25,0.12,0.06

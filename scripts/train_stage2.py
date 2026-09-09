@@ -87,6 +87,52 @@ def save_results(rows, path):
     temporary.replace(path)
 
 
+def merge_backbone_summaries(output_root):
+    """Build one compact table across all completed stage-2 backbones."""
+    frames = [pd.read_csv(path) for path in sorted(Path(output_root).glob("*/*/summary.csv"))]
+    if not frames:
+        return None
+    summary = pd.concat(frames, ignore_index=True)
+    setting_names = {
+        "human_worse_label": "Human",
+        "human_noisy_label": "Human",
+        "symmetric_0.6": "Symm0.6",
+        "pairflip_0.3": "Pairflip0.3",
+        "instance_0.4": "Inst0.4",
+    }
+    summary["setting"] = summary["dataset"].str.upper() + "-" + summary["noise_name"].map(setting_names)
+    if summary["setting"].isna().any():
+        unknown = sorted(summary.loc[summary["setting"].isna(), "noise_name"].unique())
+        raise ValueError(f"Unknown stage-2 noise names: {unknown}")
+
+    rows = []
+    for metric, mean_column, std_column in (
+        ("Accuracy", "accuracy_mean", "accuracy_std"),
+        ("Macro-F1", "macro_f1_mean", "macro_f1_std"),
+    ):
+        for statistic, column in (("Mean (%)", mean_column), ("Std (pp)", std_column)):
+            part = summary[["backbone", "setting", column]].rename(columns={column: "value"})
+            part["Metric"] = metric
+            part["Statistic"] = statistic
+            rows.append(part)
+    tidy = pd.concat(rows, ignore_index=True)
+    if tidy.duplicated(["backbone", "Metric", "Statistic", "setting"]).any():
+        raise ValueError("Duplicate stage-2 backbone summary rows.")
+
+    columns = [
+        f"{dataset}-{setting}"
+        for dataset in ("CIFAR10", "CIFAR100")
+        for setting in ("Human", "Symm0.6", "Pairflip0.3", "Inst0.4")
+    ]
+    table = tidy.pivot(index=["backbone", "Metric", "Statistic"], columns="setting", values="value")
+    table = (table.reindex(columns=columns) * 100).round(2).reset_index()
+    table = table.rename(columns={"backbone": "Backbone"})
+    destination = Path(output_root) / "backbone_comparison" / "summary.csv"
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    table.to_csv(destination, index=False)
+    return destination
+
+
 def main():
     parser = argparse.ArgumentParser(description="Train the fixed robust linear probe.")
     parser.add_argument("--config", default="configs/default.yaml")
@@ -175,9 +221,12 @@ def main():
         macro_f1_mean=("macro_f1", "mean"), macro_f1_std=("macro_f1", "std"),
     ).reset_index()
     summary.to_csv(output_path.with_name("summary.csv"), index=False)
+    backbone_summary_path = merge_backbone_summaries(output_root)
     print(summary.to_string(index=False))
     print(f"Runs: {output_path}")
     print(f"Summary: {output_path.with_name('summary.csv')}")
+    if backbone_summary_path:
+        print(f"Backbone summary: {backbone_summary_path}")
 
 
 if __name__ == "__main__":

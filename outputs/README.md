@@ -32,6 +32,8 @@ generalization/
 stage2/<backbone>/<dataset>/
   runs.csv                 # fixed CE-GCE-SoftCE metrics for each seed
   summary.csv              # fixed CE-GCE-SoftCE mean/std
+stage2/backbone_comparison/
+  summary.csv              # all-backbone Accuracy/Macro-F1 mean/std table
 ```
 
 Active backbone directory names are canonical: `vit_b16_imagenet`,
