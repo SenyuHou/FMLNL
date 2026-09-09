@@ -10,6 +10,7 @@ Tracked formal results:
 - `generalization/summaries/**`: aggregate first-stage GMM and SimiFeat tables.
 - `stage2/**/runs.csv`: final robust linear-probe metrics for each seed.
 - `stage2/**/summary.csv`: final robust linear-probe mean/std tables.
+- `clean_lp/*.csv`: DINOv2 clean-label linear-probe reference tables.
 
 Ignored artifacts include per-sample `partition.csv`, detailed first-stage run
 directories, diagnostic experiments, logs, feature caches, and historical
@@ -34,6 +35,11 @@ stage2/<backbone>/<dataset>/
   summary.csv              # fixed CE-GCE-SoftCE mean/std
 stage2/backbone_comparison/
   summary.csv              # all-backbone Accuracy/Macro-F1 mean/std table
+
+clean_lp/
+  dinov2_clean_lp_raw.csv       # six per-seed Clean-LP runs
+  clean_lp_summary.csv          # eight-column Clean-LP mean/std table
+  dinov2_ours_vs_clean_lp.csv   # eight-setting Accuracy comparison
 ```
 
 Active backbone directory names are canonical: `vit_b16_imagenet`,

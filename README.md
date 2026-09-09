@@ -244,3 +244,23 @@ The formal pipeline uses `scripts/extract_features.py`,
 CIFAR loader, noise generation, feature cache/extraction, GMM, fixed robust
 linear probe, and configuration utilities. Diagnostic scripts and outputs are
 kept only in the ignored local `history/` directory.
+
+## Clean-LP Reference
+
+`scripts/run_clean_lp.py` trains the formal clean-label linear-probe reference
+only for `dinov2_vit_b14`. It validates and reuses the same train/test feature
+caches as Ours, reads original CIFAR targets, and trains `nn.Linear` with the
+same AdamW configuration, initialization, shuffling, epochs, batch size, and
+final-epoch evaluation. It does not load noisy annotations or partitions.
+
+Run CIFAR-10 and CIFAR-100 separately; the second completed command creates the
+eight-column summary and direct Accuracy comparison with Ours:
+
+```bash
+python scripts/run_clean_lp.py --dataset cifar10 --set backbone=dinov2_vit_b14
+python scripts/run_clean_lp.py --dataset cifar100 --set backbone=dinov2_vit_b14
+```
+
+Formal outputs are `outputs/clean_lp/dinov2_clean_lp_raw.csv`,
+`outputs/clean_lp/clean_lp_summary.csv`, and
+`outputs/clean_lp/dinov2_ours_vs_clean_lp.csv`.

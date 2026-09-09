@@ -145,3 +145,70 @@ def train_robust_linear_probe(
     accuracy = float((predictions == test_labels).float().mean())
     macro_f1 = float(f1_score(test_labels.numpy(), predictions.numpy(), average="macro"))
     return {"accuracy": accuracy, "macro_f1": macro_f1}
+
+
+def train_clean_linear_probe(
+    train_features,
+    clean_labels,
+    test_features,
+    test_labels,
+    num_classes,
+    seed,
+    device,
+    config=LinearProbeConfig(),
+):
+    """Train the Clean-LP reference with ordinary CE on ground-truth labels."""
+    if train_features.ndim != 2 or test_features.shape[-1] != train_features.shape[-1]:
+        raise ValueError("Train and test feature dimensions must match.")
+    if len(train_features) != len(clean_labels) or len(test_features) != len(test_labels):
+        raise ValueError("Features and clean labels must have matching lengths.")
+    if not all(torch.isfinite(value).all() for value in (train_features, test_features)):
+        raise ValueError("Clean-LP features contain NaN or Inf.")
+    if clean_labels.min() < 0 or clean_labels.max() >= num_classes:
+        raise ValueError("Clean-LP training labels are outside the class range.")
+    if test_labels.min() < 0 or test_labels.max() >= num_classes:
+        raise ValueError("Clean-LP test labels are outside the class range.")
+
+    generator = torch.Generator().manual_seed(seed)
+    epoch_orders = [torch.randperm(len(train_features), generator=generator) for _ in range(config.epochs)]
+    set_seed(seed)
+    classifier = nn.Linear(train_features.shape[-1], num_classes).to(device)
+    optimizer = torch.optim.AdamW(
+        classifier.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay
+    )
+    train_features = train_features.to(device)
+    clean_labels = clean_labels.to(device)
+    test_features = test_features.to(device)
+
+    progress = tqdm(epoch_orders, desc=f"Clean-LP seed={seed}", unit="epoch", dynamic_ncols=True)
+    for cpu_order in progress:
+        classifier.train()
+        order = cpu_order.to(device)
+        epoch_loss = 0.0
+        num_batches = 0
+        for start in range(0, len(order), config.batch_size):
+            index = order[start : start + config.batch_size]
+            logits = classifier(train_features[index])
+            loss = F.cross_entropy(logits, clean_labels[index])
+            if not torch.isfinite(loss):
+                raise ValueError("Clean-LP loss is NaN or Inf.")
+            optimizer.zero_grad(set_to_none=True)
+            loss.backward()
+            optimizer.step()
+            epoch_loss += loss.item()
+            num_batches += 1
+        progress.set_postfix(loss=f"{epoch_loss / num_batches:.4f}")
+
+    classifier.eval()
+    predictions = []
+    with torch.no_grad():
+        for start in range(0, len(test_features), config.batch_size):
+            predictions.append(
+                classifier(test_features[start : start + config.batch_size]).argmax(dim=1).cpu()
+            )
+    predictions = torch.cat(predictions)
+    accuracy = float((predictions == test_labels).float().mean())
+    macro_f1 = float(f1_score(test_labels.numpy(), predictions.numpy(), average="macro"))
+    if not np.isfinite([accuracy, macro_f1]).all():
+        raise ValueError("Clean-LP metrics contain NaN or Inf.")
+    return {"accuracy": accuracy, "macro_f1": macro_f1}

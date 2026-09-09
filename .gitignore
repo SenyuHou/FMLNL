@@ -19,6 +19,13 @@
 !/outputs/stage2/**/runs.csv
 !/outputs/stage2/**/summary.csv
 
+# Clean-label linear-probe reference: sync only its three compact CSV tables
+!/outputs/clean_lp/
+/outputs/clean_lp/*
+!/outputs/clean_lp/dinov2_clean_lp_raw.csv
+!/outputs/clean_lp/clean_lp_summary.csv
+!/outputs/clean_lp/dinov2_ours_vs_clean_lp.csv
+
 # Validation-only and temporary files
 /tests/
 /tmp/
