@@ -1,0 +1,2 @@
+dataset,backbone,feature_sha256,device,tau_global,tau_local,knn_k,human_noisy_label,instance_0.4,pairflip_0.3,symmetric_0.6
+cifar100,clip_vit_b16,5ae0b109e323262ebed9d7509954da63cab2659da0543079889ea08d42bbc1bd,cuda,0.8,0.5,20,70.10309256745307,93.61133311778795,73.28262502956252,95.2286672289277
