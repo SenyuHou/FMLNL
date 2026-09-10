@@ -23,10 +23,11 @@ from lnl_foundation.baselines.deft import DeFTConfig, run_deft
 from lnl_foundation.data.datasets import load_cifar_base
 from lnl_foundation.data.noise import HUMAN_CHOICES, human_noise_key
 from lnl_foundation.features import feature_cache_path, load_features
+from lnl_foundation.partition.saved import FORMAL_PARTITION_PROTOCOL
 from lnl_foundation.utils import get_device, load_config, save_json, set_seed
 
 
-SOURCE_PROTOCOL = "global_local_gmm_pairflip_v1"
+SOURCE_PROTOCOL = FORMAL_PARTITION_PROTOCOL
 BASELINE_PROTOCOL = "stage1_clip_baselines_v1"
 METHOD_NAMES = {"clipcleaner": "CLIPCleaner", "deft": "DeFT"}
 CLIP_BACKBONES = ("clip_vit_b16", "clip_vit_l14")
@@ -259,7 +260,7 @@ def main():
                 "noisy_labels_sha256": label_sha256,
                 "source_backbone": source["backbone"],
                 "source_feature_sha256": source["feature_sha256"],
-                "source_partition": str(source_path.with_name("partition.csv").relative_to(generalization_root)),
+                "source_partition": source_path.with_name("partition.csv").relative_to(generalization_root).as_posix(),
                 "predicted_clean": int(result["predicted_clean"].sum()),
                 "predicted_noisy": int(predicted_noisy.sum()),
                 "score_direction": "higher_is_noisier",

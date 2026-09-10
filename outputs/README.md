@@ -5,6 +5,12 @@ local machine or server are expected to appear in Git and should be committed.
 Large intermediate artifacts remain local even when they are written below
 `outputs/`.
 
+Feature byte hashes are provenance identifiers, not cross-machine compatibility
+requirements. First-stage raw runs, SimiFeat, and CLIP baseline artifacts remain
+hash-separated. Stage-2 uses one formal result identity per canonical backbone,
+dataset, noise setting, and seed, while recording current and source hashes in
+`runs.csv`; reruns replace that identity instead of creating duplicate rows.
+
 Tracked formal results:
 
 - `generalization/summaries/**`: aggregate first-stage GMM and SimiFeat tables.

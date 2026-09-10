@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from lnl_foundation.data.datasets import load_cifar_base, DATASET_META
 from lnl_foundation.backbones.frozen import canonical_backbone_name
 from lnl_foundation.features import feature_cache_path, load_features
+from lnl_foundation.partition.saved import resolve_saved_partition
 from lnl_foundation.partition.simifeat import nearest, detect_settings
 from lnl_foundation.utils import load_config, save_json
 
@@ -45,14 +46,22 @@ def merge_results(root, cfg):
     if not baseline_rows:
         return
     baselines = pd.DataFrame(baseline_rows)
-    keys = ["dataset", "noise_name", "seed", "feature_sha256"]
+    if "source_feature_sha256" not in baselines:
+        # Older runs required exact hashes, so their source and evaluated features were identical.
+        baselines["source_feature_sha256"] = baselines["feature_sha256"]
+    baselines = baselines[baselines["backbone"] == cfg["backbone"]]
+    if cfg.get("feature_sha256"):
+        baselines = baselines[baselines["feature_sha256"] == cfg["feature_sha256"]]
+    keys = ["dataset", "noise_name", "seed"]
     if baselines.duplicated(keys + ["method"]).any():
-        raise ValueError("Duplicate baseline runs.")
-    # Pair only to the current formal GMM runs, never to old paper numbers.
-    baselines = baselines.merge(ours[keys], on=keys, validate="many_to_one")
-    common = keys + ["method", "precision", "recall", "f1", "actual_noise_rate"]
+        raise ValueError("Multiple SimiFeat feature variants match; run normally instead of --summarize_only.")
+    # Pair each baseline to the exact source partition it reused, not to its current feature bytes.
+    ours_source = ours.rename(columns={"feature_sha256": "source_feature_sha256"})
+    source_keys = keys + ["source_feature_sha256"]
+    baselines = baselines.merge(ours_source[source_keys], on=source_keys, validate="many_to_one")
+    common = keys + ["backbone", "feature_sha256", "method", "precision", "recall", "f1", "actual_noise_rate"]
     runs = pd.concat([ours[common], baselines[common]], ignore_index=True)
-    summary = runs.groupby(["dataset", "noise_name", "method", "feature_sha256"]).agg(
+    summary = runs.groupby(["dataset", "noise_name", "method"], dropna=False).agg(
         n_runs=("f1", "size"), precision_mean=("precision", "mean"), precision_std=("precision", "std"),
         recall_mean=("recall", "mean"), recall_std=("recall", "std"), f1_mean=("f1", "mean"), f1_std=("f1", "std"),
     ).reset_index()
@@ -70,7 +79,7 @@ def merge_results(root, cfg):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="SimiFeat on exactly the current GMM features and noisy labels.")
+    parser = argparse.ArgumentParser(description="SimiFeat on current features with compatible saved noisy labels.")
     parser.add_argument("--dataset", choices=["cifar10", "cifar100"])
     parser.add_argument("--config", default="configs/default.yaml")
     parser.add_argument("--set", dest="overrides", action="append", default=[])
@@ -94,20 +103,36 @@ def main():
         expected_backbone=cfg["backbone"],
     )
     digest = hashlib.sha256(features.numpy().tobytes()).hexdigest()
+    cfg["feature_sha256"] = digest
     source_rows = []
-    for path in sorted((root / args.dataset).glob("**/metrics.json")):
-        row = json.loads(path.read_text(encoding="utf-8"))
-        if row["tau_local"] == cfg["local_posterior_threshold"] and row["tau_global"] == cfg["global_posterior_threshold"] and row["knn_k"] == cfg["knn_k"] and row["feature_sha256"] == digest:
-            source_rows.append((path, row))
-    if len(source_rows) != 12:
-        raise ValueError(f"Expected 4 settings x 3 seeds for {args.dataset}, found {len(source_rows)}.")
+    noise_names = (
+        "human_worse_label" if args.dataset == "cifar10" else "human_noisy_label",
+        "symmetric_0.6",
+        "pairflip_0.3",
+        "instance_0.4",
+    )
+    for name in noise_names:
+        for seed in (1, 2, 3):
+            path, row, match_type = resolve_saved_partition(
+                root,
+                args.dataset,
+                cfg["backbone"],
+                name,
+                seed,
+                cfg["global_posterior_threshold"],
+                cfg["local_posterior_threshold"],
+                cfg["knn_k"],
+                current_feature_sha256=digest,
+                equivalence_columns=("index", "noisy_label", "partition"),
+            )
+            source_rows.append((path.with_name("metrics.json"), row, match_type))
     clean = np.asarray(base.targets)
     print(f"{args.dataset}: computing exact k=10 neighbors on {tuple(features.shape)} fixed features", flush=True)
     neighbors = nearest(features.to(cfg["device"]), 10)
     output = root / "simifeat" / args.dataset / cfg["backbone"] / digest[:12]
     for seed in [1, 2, 3]:
         label_sets, metadata = {}, {}
-        for path, row in source_rows:
+        for path, row, match_type in source_rows:
             if row["seed"] != seed:
                 continue
             name = row["noise_name"]
@@ -129,7 +154,9 @@ def main():
                 raise ValueError("Source GMM result does not match saved noisy labels.")
             label_sets[name] = labels
             metadata[name] = {**row, "noisy_labels_sha256": label_digest,
-                "source_partition": str(path.with_name("partition.csv").relative_to(root))}
+                "source_feature_sha256": row.get("feature_sha256"),
+                "partition_match": match_type,
+                "source_partition": path.with_name("partition.csv").relative_to(root).as_posix()}
         if not label_sets:
             continue
         results = detect_settings(features, label_sets, DATASET_META[args.dataset]["num_classes"], seed, neighbors, cfg["device"])
@@ -143,7 +170,8 @@ def main():
                 "rank_vote_count": result["rank_vote_count"], "rank_score": result["score"]}).to_csv(out / "predictions.csv", index=False)
             for method, key in [("SimiFeat-V", "vote"), ("SimiFeat-R", "rank")]:
                 detected, truth = result[key], labels != clean
-                row = {k: metadata[name][k] for k in ["dataset", "backbone", "feature_sha256", "noise_name", "seed", "actual_noise_rate", "noisy_labels_sha256", "source_partition"]}
+                row = {k: metadata[name][k] for k in ["dataset", "backbone", "noise_name", "seed", "actual_noise_rate", "noisy_labels_sha256", "source_feature_sha256", "partition_match", "source_partition"]}
+                row["feature_sha256"] = digest
                 row.update(method=method, comparison_protocol=PROTOCOL, k=10, detection_rounds=21,
                     feature_views=1, augmentation=False, hoc_trials=10, hoc_sample_size=15000,
                     hoc_first_steps=400, hoc_warm_steps=20, device=cfg["device"],

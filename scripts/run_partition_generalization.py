@@ -16,10 +16,11 @@ from lnl_foundation.data.noise import HUMAN_CHOICES, canonical_noise_type, human
 from lnl_foundation.backbones.frozen import canonical_backbone_name
 from lnl_foundation.features import feature_cache_path, load_features
 from lnl_foundation.partition.global_local_gmm import CLEAN, HARD, NOISY, GlobalLocalGMMPartitioner
+from lnl_foundation.partition.saved import FORMAL_PARTITION_PROTOCOL
 from lnl_foundation.utils import load_config, save_json
 
 
-PROTOCOL = "global_local_gmm_pairflip_v1"
+PROTOCOL = FORMAL_PARTITION_PROTOCOL
 SETTINGS = {"human": None, "symmetric": 0.6, "pairflip": 0.3, "instance": 0.4}
 
 

@@ -167,6 +167,15 @@ mean/std tables are refreshed at
 probabilities, and anchor indices are saved locally under `artifacts/` and are
 excluded from version control.
 
+Saved partitions are resolved by semantic experiment identity: dataset,
+canonical backbone, noise setting, seed, and fixed GMM parameters. An exact
+feature-byte hash is preferred but is not required, allowing the same formal
+partition to be used on local and server caches of the same backbone. The
+runner never reuses Clean/Hard/Noisy partitions across backbones. If several
+non-equivalent compatible partitions exist without an exact match, it stops
+with an ambiguity error. Result rows retain both the current feature hash and
+the source partition feature/file hashes for provenance.
+
 ## Results
 
 Each run writes only `metrics.json` and `partition.csv` under:

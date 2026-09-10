@@ -1,6 +1,5 @@
 import argparse
 import hashlib
-import json
 import sys
 from pathlib import Path
 
@@ -14,6 +13,7 @@ from lnl_foundation.backbones.frozen import canonical_backbone_name
 from lnl_foundation.data.noise import canonical_noise_type
 from lnl_foundation.features import feature_cache_path
 from lnl_foundation.partition.global_local_gmm import CLEAN, HARD, NOISY
+from lnl_foundation.partition.saved import resolve_saved_partition
 from lnl_foundation.training import ECE_BINS, GCE_Q, PROTOTYPE_TEMPERATURE, train_robust_linear_probe
 from lnl_foundation.utils import get_device, load_config
 
@@ -48,21 +48,18 @@ def setting_name(dataset, noise_type, ratio):
 
 def find_partition(root, dataset, backbone, name, feature_sha256, seed, cfg):
     partition_seed = 1 if name.startswith("human_") else seed
-    matches = []
-    for metrics_path in Path(root).glob(f"{dataset}/{backbone}/**/metrics.json"):
-        metadata = json.loads(metrics_path.read_text(encoding="utf-8"))
-        if (
-            metadata.get("noise_name") == name
-            and metadata.get("seed") == partition_seed
-            and metadata.get("tau_global") == cfg["global_posterior_threshold"]
-            and metadata.get("tau_local") == cfg["local_posterior_threshold"]
-            and metadata.get("knn_k") == cfg["knn_k"]
-            and metadata.get("feature_sha256") == feature_sha256
-        ):
-            matches.append(metrics_path.with_name("partition.csv"))
-    if len(matches) != 1:
-        raise RuntimeError(f"Expected one partition for {dataset}/{name}/seed_{partition_seed}, found {len(matches)}.")
-    return matches[0], partition_seed
+    path, metadata, match_type = resolve_saved_partition(
+        root=root,
+        dataset=dataset,
+        backbone=backbone,
+        noise_name=name,
+        seed=partition_seed,
+        tau_global=cfg["global_posterior_threshold"],
+        tau_local=cfg["local_posterior_threshold"],
+        knn_k=cfg["knn_k"],
+        current_feature_sha256=feature_sha256,
+    )
+    return path, partition_seed, metadata, match_type
 
 
 def load_partition(path, num_samples):
@@ -191,15 +188,18 @@ def main():
             if (noise_type, seed) in completed and not args.force:
                 print(f"Skipping completed run {args.dataset}/{name}/seed_{seed}")
                 continue
-            partition_path, partition_seed = find_partition(
+            partition_path, partition_seed, partition_metadata, partition_match = find_partition(
                 cfg["output_dir"], args.dataset, backbone, name, feature_sha256, seed, cfg
             )
             noisy_labels, partition, global_margin, counts = load_partition(
                 partition_path, len(train_features)
             )
+            partition_file_sha256 = hashlib.sha256(partition_path.read_bytes()).hexdigest()
+            source_partition = partition_path.relative_to(Path(cfg["output_dir"])).as_posix()
             print(
                 f"{args.dataset}/{name}/seed_{seed} (partition seed {partition_seed}): "
-                f"Clean={counts['n_clean']} Hard={counts['n_hard']} Noisy={counts['n_noisy']}"
+                f"Clean={counts['n_clean']} Hard={counts['n_hard']} Noisy={counts['n_noisy']} "
+                f"[{partition_match}]"
             )
             result = train_robust_linear_probe(
                 train_features,
@@ -223,6 +223,10 @@ def main():
                 "backbone": backbone,
                 "feature_dim": train_features.shape[-1],
                 "feature_sha256": feature_sha256,
+                "partition_feature_sha256": partition_metadata.get("feature_sha256"),
+                "partition_file_sha256": partition_file_sha256,
+                "partition_match": partition_match,
+                "source_partition": source_partition,
                 "seed": seed,
                 "partition_seed": partition_seed,
                 "tau_global": cfg["global_posterior_threshold"],
@@ -254,6 +258,10 @@ def main():
                     "noise_name": name,
                     "seed": seed,
                     "feature_sha256": feature_sha256,
+                    "partition_feature_sha256": partition_metadata.get("feature_sha256"),
+                    "partition_file_sha256": partition_file_sha256,
+                    "partition_match": partition_match,
+                    "source_partition": source_partition,
                     "ece_num_bins": ECE_BINS,
                 },
             )
