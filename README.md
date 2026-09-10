@@ -264,3 +264,30 @@ python scripts/run_clean_lp.py --dataset cifar100 --set backbone=dinov2_vit_b14
 Formal outputs are `outputs/clean_lp/dinov2_clean_lp_raw.csv`,
 `outputs/clean_lp/clean_lp_summary.csv`, and
 `outputs/clean_lp/dinov2_ours_vs_clean_lp.csv`.
+
+## CLIP Stage-1 Baselines
+
+`scripts/run_stage1_baseline.py` adapts the original CLIPCleaner and DeFT
+noisy-label detectors to the exact labels already stored by the formal FMLNL
+Global-Local-GMM runs. Each command runs one method, one dataset, and one CLIP
+backbone over Human, symmetric 0.6, all-class pairflip 0.3, and matrix IDN 0.4
+for seeds 1, 2, and 3.
+
+```bash
+python scripts/run_stage1_baseline.py --method clipcleaner --dataset cifar10 --backbone clip_vit_b16
+python scripts/run_stage1_baseline.py --method deft --dataset cifar100 --backbone clip_vit_l14
+```
+
+CLIPCleaner reuses the cached normalized CLIP image features and loads the
+matching OpenAI CLIP text encoder for the authors' descriptor prompts. DeFT
+loads the full matching OpenAI CLIP model because its original detector trains
+deep visual prompts and positive/negative text prompts for ten epochs. DeFT's
+upstream batch size is 64; use `--batch_size` only if a larger CLIP model does
+not fit available GPU memory. Ground-truth clean labels are only read after
+detection to calculate Precision, Recall, F1, AUROC, and AUPRC.
+
+Compact outputs are written below
+`outputs/generalization/baselines/summaries/<backbone>/<method>/`. Detailed
+per-sample predictions and per-run metadata stay below the method directory
+and are intentionally ignored by Git. See `docs/baselines/README.md` for the
+adaptation boundary and source licenses.

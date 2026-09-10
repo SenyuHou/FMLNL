@@ -12,6 +12,12 @@
 !/outputs/generalization/summaries/
 !/outputs/generalization/summaries/**
 
+# Stage 1 CLIP baselines: keep per-sample files local, sync compact tables
+!/outputs/generalization/baselines/
+/outputs/generalization/baselines/*
+!/outputs/generalization/baselines/summaries/
+!/outputs/generalization/baselines/summaries/**
+
 # Stage 2: sync per-seed metrics and aggregate metrics, never future large artifacts
 !/outputs/stage2/
 /outputs/stage2/**

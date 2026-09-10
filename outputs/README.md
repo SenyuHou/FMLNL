@@ -8,6 +8,7 @@ Large intermediate artifacts remain local even when they are written below
 Tracked formal results:
 
 - `generalization/summaries/**`: aggregate first-stage GMM and SimiFeat tables.
+- `generalization/baselines/summaries/**`: compact CLIPCleaner/DeFT run and mean/std tables.
 - `stage2/**/runs.csv`: final robust linear-probe metrics for each seed.
 - `stage2/**/summary.csv`: final robust linear-probe mean/std tables.
 - `clean_lp/*.csv`: DINOv2 clean-label linear-probe reference tables.
@@ -29,6 +30,13 @@ generalization/
     comparison_summary.csv   # GMM + SimiFeat mean/std
     comparison_f1.csv        # GMM + SimiFeat eight-setting F1 table
   summaries/backbone_comparison_f1.csv  # all completed backbones
+  baselines/
+    clipcleaner/<dataset>/<backbone>/<feature_hash>/<noise>/seed_<seed>/
+    deft/<dataset>/<backbone>/<feature_hash>/<noise>/seed_<seed>/
+    summaries/<backbone>/<method>/
+      runs.csv               # all completed per-seed detection metrics
+      summary.csv            # Precision/Recall/F1/AUROC/AUPRC mean/std
+      f1.csv                 # noise-setting F1 table
 
 stage2/<backbone>/<dataset>/
   runs.csv                 # fixed CE-GCE-SoftCE metrics for each seed
