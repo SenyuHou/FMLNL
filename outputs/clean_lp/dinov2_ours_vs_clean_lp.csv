@@ -1,0 +1,9 @@
+Dataset,Noise,Ours_Acc_Mean,Ours_Acc_Std,CleanLP_Acc_Mean,CleanLP_Acc_Std,Ours_minus_CleanLP
+CIFAR10,Human,97.72,0.03,98.74,0.0,-1.02
+CIFAR10,Symm0.6,98.49,0.02,98.74,0.0,-0.25
+CIFAR10,Pairflip0.3,98.63,0.06,98.74,0.0,-0.11
+CIFAR10,Inst0.4,98.55,0.07,98.74,0.0,-0.19
+CIFAR100,Human,84.69,0.02,91.65,0.02,-6.96
+CIFAR100,Symm0.6,89.74,0.1,91.65,0.02,-1.91
+CIFAR100,Pairflip0.3,89.8,0.22,91.65,0.02,-1.85
+CIFAR100,Inst0.4,90.63,0.19,91.65,0.02,-1.02

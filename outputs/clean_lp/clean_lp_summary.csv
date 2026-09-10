@@ -1,0 +1,5 @@
+Backbone,Method,Metric,Statistic,CIFAR10-Human,CIFAR10-Symm0.6,CIFAR10-Pairflip0.3,CIFAR10-Inst0.4,CIFAR100-Human,CIFAR100-Symm0.6,CIFAR100-Pairflip0.3,CIFAR100-Inst0.4
+dinov2_vit_b14,Clean-LP,Accuracy,Mean (%),98.74,98.74,98.74,98.74,91.65,91.65,91.65,91.65
+dinov2_vit_b14,Clean-LP,Accuracy,Std (pp),0.0,0.0,0.0,0.0,0.02,0.02,0.02,0.02
+dinov2_vit_b14,Clean-LP,Macro-F1,Mean (%),98.74,98.74,98.74,98.74,91.64,91.64,91.64,91.64
+dinov2_vit_b14,Clean-LP,Macro-F1,Std (pp),0.0,0.0,0.0,0.0,0.02,0.02,0.02,0.02
