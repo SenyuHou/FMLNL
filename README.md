@@ -214,6 +214,17 @@ calls Reliability-Anchored Temperature Calibration. Compact results are saved
 under `outputs/stage2_baselines/<method>/<backbone>/<dataset>/`; detailed test
 logits and probabilities are local-only artifacts.
 
+To schedule all baseline combinations sequentially on one logical CUDA device:
+
+```bash
+python scripts/run_all_stage2_baselines.py --device cuda:0 --set data_root=../DATASETS
+```
+
+This covers five backbones for CE, GCE, Co-teaching, DivideMix, and DISC, and
+the two CLIP backbones for CLIPCleaner. Use `--methods ce` (or another subset)
+to assign methods to separate GPUs. Completed child runs are reused unless
+`--force` is passed. `--dry_run` prints the complete job list without training.
+
 ### Standalone ECE Reports
 
 Build the ECE-only reports after Stage-2 runs finish:
