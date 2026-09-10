@@ -1,0 +1,72 @@
+ce:
+  epochs: 50
+  batch_size: 256
+  optimizer: adamw
+  learning_rate: 0.001
+  weight_decay: 0.0001
+
+gce:
+  epochs: 50
+  batch_size: 256
+  optimizer: adamw
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  q: 0.7
+
+clipcleaner:
+  epochs: 50
+  batch_size: 256
+  optimizer: adamw
+  learning_rate: 0.001
+  weight_decay: 0.0001
+
+coteaching:
+  epochs: 200
+  batch_size: 128
+  optimizer: adam
+  learning_rate: 0.001
+  weight_decay: 0.0
+  num_gradual: 10
+  exponent: 1.0
+  epoch_decay_start: 80
+  beta1_initial: 0.9
+  beta1_final: 0.1
+  human_forget_rate: 0.4
+
+dividemix:
+  epochs: 300
+  batch_size: 64
+  optimizer: sgd
+  learning_rate: 0.02
+  momentum: 0.9
+  weight_decay: 0.0005
+  warmup_cifar10: 10
+  warmup_cifar100: 30
+  clean_probability_threshold: 0.5
+  sharpen_temperature: 0.5
+  mixup_alpha: 4.0
+  unsupervised_weight: 25.0
+  rampup_length: 16
+  learning_rate_decay_epoch: 150
+  learning_rate_decay: 0.1
+  weak_feature_dropout: 0.05
+
+disc:
+  epochs: 200
+  batch_size: 128
+  optimizer: sgd
+  learning_rate: 0.1
+  momentum: 0.0
+  weight_decay: 0.001
+  milestones: [80, 160]
+  learning_rate_decay: 0.1
+  start_epoch: 20
+  instance_start_epoch: 15
+  confidence_momentum: 0.99
+  high_noise_confidence_momentum: 0.95
+  correction_sigma: 0.5
+  mixup_alpha: 5.0
+  gce_q: 0.7
+  high_noise_hard_weight: 0.2
+  weak_feature_dropout: 0.05
+  strong_feature_dropout: 0.2

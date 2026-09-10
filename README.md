@@ -176,6 +176,44 @@ non-equivalent compatible partitions exist without an exact match, it stops
 with an ambiguity error. Result rows retain both the current feature hash and
 the source partition feature/file hashes for provenance.
 
+### Stage-2 Baselines
+
+The standalone baseline runner trains one method, dataset, and frozen backbone
+per command. It automatically evaluates Human, symmetric 0.6, pairflip 0.3,
+and instance-dependent 0.4 noise with seeds 1, 2, and 3:
+
+```bash
+python scripts/run_stage2_baseline.py --method ce --dataset cifar10 --backbone dinov2_vit_b14 --device cuda:0
+python scripts/run_stage2_baseline.py --method gce --dataset cifar10 --backbone dinov2_vit_b14 --device cuda:0
+python scripts/run_stage2_baseline.py --method coteaching --dataset cifar10 --backbone dinov2_vit_b14 --device cuda:0
+python scripts/run_stage2_baseline.py --method dividemix --dataset cifar10 --backbone dinov2_vit_b14 --device cuda:0
+python scripts/run_stage2_baseline.py --method disc --dataset cifar10 --backbone dinov2_vit_b14 --device cuda:0
+python scripts/run_stage2_baseline.py --method clipcleaner --dataset cifar10 --backbone dinov2_vit_b14 --device cuda:0
+```
+
+CE, GCE, Co-teaching, DivideMix, and DISC generate the project's standard
+noisy labels directly and do not read a Global-Local-GMM partition. The
+CLIPCleaner training baseline is different by design: it reads the Stage-1
+`predictions.csv` for `clip_vit_b16` by default, verifies its noisy labels and
+sample order, and trains CE only on rows predicted clean. Use
+`--clipcleaner_source_backbone clip_vit_l14` to select the other CLIP detector;
+if multiple feature variants are present, specify the displayed prefix with
+`--clipcleaner_feature_hash`.
+
+Co-teaching retains two-head small-loss exchange and its forget-rate schedule.
+DivideMix retains two-head co-division, loss GMM, target refinement/co-guessing,
+sharpening, and MixMatch. DISC retains dynamic weak/strong selection, separate
+clean/hard losses, and correction followed by MixUp. Because cached frozen
+features do not contain two independently augmented images, the weak/strong
+views required by DivideMix and DISC use feature dropout configured centrally
+in `configs/stage2_baselines.yaml`. All other upstream method hyperparameters
+used by the adaptation are also kept in that file.
+
+Every baseline reports Accuracy, Macro-F1, and 15-bin raw ECE. No baseline
+calls Reliability-Anchored Temperature Calibration. Compact results are saved
+under `outputs/stage2_baselines/<method>/<backbone>/<dataset>/`; detailed test
+logits and probabilities are local-only artifacts.
+
 ### Standalone ECE Reports
 
 Build the ECE-only reports after Stage-2 runs finish:
@@ -186,8 +224,8 @@ python scripts/summarize_ece.py
 
 The publication-style table is `outputs/ece/ece_table.csv`; per-seed values
 and machine-readable mean/std values are saved as `ece_runs.csv` and
-`ece_summary.csv`. Ours contributes both Raw and Calibrated rows. Future
-Stage-2 baselines are discovered from `outputs/stage2_baselines/**/runs.csv`
+`ece_summary.csv`. Ours contributes both Raw and Calibrated rows. Stage-2
+baselines are discovered from `outputs/stage2_baselines/**/runs.csv`
 and contribute Raw rows only. A baseline file must contain `method`,
 `backbone`, `dataset`, `noise_name`, `seed`, and `ece_raw`; `ece_num_bins=15`
 is recommended. If a noise-independent reference omits `noise_name`, its ECE

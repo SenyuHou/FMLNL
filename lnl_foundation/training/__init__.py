@@ -13,6 +13,7 @@ from .calibration import (
     expected_calibration_error,
     reliability_anchored_temperature,
 )
+from .baseline_linear_probe import METHODS as STAGE2_BASELINE_METHODS, train_stage2_baseline
 
 __all__ = [
     "GCE_Q",
@@ -26,4 +27,6 @@ __all__ = [
     "ECE_BINS",
     "expected_calibration_error",
     "reliability_anchored_temperature",
+    "STAGE2_BASELINE_METHODS",
+    "train_stage2_baseline",
 ]
