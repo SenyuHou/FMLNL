@@ -1,0 +1,4 @@
+dataset,backbone,method,seed,feature_dim,feature_sha256,n_train,n_test,training_label_source,accuracy,macro_f1
+cifar100,dinov2_vit_b14,Clean-LP,1,768,ef58a637e4eefb95d7acdaf17accf5debe19047613be98506bb859c4ba00ec3a,50000,10000,clean_ground_truth,0.9164999723434448,0.916372567000389
+cifar100,dinov2_vit_b14,Clean-LP,2,768,ef58a637e4eefb95d7acdaf17accf5debe19047613be98506bb859c4ba00ec3a,50000,10000,clean_ground_truth,0.916700005531311,0.9166004038760244
+cifar100,dinov2_vit_b14,Clean-LP,3,768,ef58a637e4eefb95d7acdaf17accf5debe19047613be98506bb859c4ba00ec3a,50000,10000,clean_ground_truth,0.9164000153541565,0.9162638922337594
