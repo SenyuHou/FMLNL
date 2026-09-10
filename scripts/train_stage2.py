@@ -14,7 +14,7 @@ from lnl_foundation.backbones.frozen import canonical_backbone_name
 from lnl_foundation.data.noise import canonical_noise_type
 from lnl_foundation.features import feature_cache_path
 from lnl_foundation.partition.global_local_gmm import CLEAN, HARD, NOISY
-from lnl_foundation.training import GCE_Q, PROTOTYPE_TEMPERATURE, train_robust_linear_probe
+from lnl_foundation.training import ECE_BINS, GCE_Q, PROTOTYPE_TEMPERATURE, train_robust_linear_probe
 from lnl_foundation.utils import get_device, load_config
 
 
@@ -22,6 +22,7 @@ METHOD = "CE-GCE-SoftCE"
 SETTINGS = {"human": None, "symmetric": 0.6, "pairflip": 0.3, "instance": 0.4}
 NUM_CLASSES = {"cifar10": 10, "cifar100": 100}
 FIXED_PARTITION = {"global_posterior_threshold": 0.8, "local_posterior_threshold": 0.5, "knn_k": 20}
+REQUIRED_RESULT_FIELDS = ("accuracy", "macro_f1", "ece_raw", "temperature", "ece_calibrated")
 
 
 def load_cache(path, with_labels=False):
@@ -65,11 +66,14 @@ def find_partition(root, dataset, backbone, name, feature_sha256, seed, cfg):
 
 
 def load_partition(path, num_samples):
-    frame = pd.read_csv(path, usecols=["index", "noisy_label", "partition"])
+    frame = pd.read_csv(path, usecols=["index", "noisy_label", "partition", "global_margin"])
     if not np.array_equal(frame["index"].to_numpy(), np.arange(num_samples)):
         raise ValueError(f"Partition rows are not in CIFAR order: {path}")
     labels = torch.from_numpy(frame["noisy_label"].to_numpy(dtype=np.int64, copy=True))
     partition = torch.from_numpy(frame["partition"].to_numpy(dtype=np.int64, copy=True))
+    global_margin = torch.from_numpy(frame["global_margin"].to_numpy(dtype=np.float32, copy=True))
+    if not torch.isfinite(global_margin).all():
+        raise ValueError(f"Global margins contain NaN or Inf: {path}")
     counts = {
         "n_clean": int((partition == CLEAN).sum()),
         "n_hard": int((partition == HARD).sum()),
@@ -77,7 +81,19 @@ def load_partition(path, num_samples):
     }
     if sum(counts.values()) != num_samples:
         raise ValueError(f"Partition counts do not sum to {num_samples}: {path}")
-    return labels, partition, counts
+    return labels, partition, global_margin, counts
+
+
+def result_is_complete(row):
+    try:
+        return np.isfinite([float(row[field]) for field in REQUIRED_RESULT_FIELDS]).all()
+    except (KeyError, TypeError, ValueError):
+        return False
+
+
+def save_artifacts(artifacts, metrics, path, metadata):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    torch.save({**metadata, **metrics, **artifacts}, path)
 
 
 def save_results(rows, path):
@@ -109,6 +125,8 @@ def merge_backbone_summaries(output_root):
     for metric, mean_column, std_column in (
         ("Accuracy", "accuracy_mean", "accuracy_std"),
         ("Macro-F1", "macro_f1_mean", "macro_f1_std"),
+        ("ECE-Raw", "ece_raw_mean", "ece_raw_std"),
+        ("ECE-Calibrated", "ece_calibrated_mean", "ece_calibrated_std"),
     ):
         for statistic, column in (("Mean (%)", mean_column), ("Std (pp)", std_column)):
             part = summary[["backbone", "setting", column]].rename(columns={column: "value"})
@@ -160,7 +178,9 @@ def main():
     test_features, test_labels = load_cache(test_path, with_labels=True)
     feature_sha256 = hashlib.sha256(train_features.numpy().tobytes()).hexdigest()
     rows = [] if args.force or not output_path.exists() else pd.read_csv(output_path).to_dict("records")
-    completed = {(row["noise_type"], int(row["seed"])) for row in rows}
+    completed = {
+        (row["noise_type"], int(row["seed"])) for row in rows if result_is_complete(row)
+    }
     device = get_device(cfg["device"])
     print(f"Loaded {args.dataset} {backbone}: train={tuple(train_features.shape)}, test={tuple(test_features.shape)}")
 
@@ -174,12 +194,14 @@ def main():
             partition_path, partition_seed = find_partition(
                 cfg["output_dir"], args.dataset, backbone, name, feature_sha256, seed, cfg
             )
-            noisy_labels, partition, counts = load_partition(partition_path, len(train_features))
+            noisy_labels, partition, global_margin, counts = load_partition(
+                partition_path, len(train_features)
+            )
             print(
                 f"{args.dataset}/{name}/seed_{seed} (partition seed {partition_seed}): "
                 f"Clean={counts['n_clean']} Hard={counts['n_hard']} Noisy={counts['n_noisy']}"
             )
-            metrics = train_robust_linear_probe(
+            result = train_robust_linear_probe(
                 train_features,
                 noisy_labels,
                 partition,
@@ -188,7 +210,10 @@ def main():
                 NUM_CLASSES[args.dataset],
                 seed,
                 device,
+                global_margin=global_margin,
             )
+            artifacts = result.pop("_artifacts")
+            metrics = result
             row = {
                 "method": METHOD,
                 "dataset": args.dataset,
@@ -205,20 +230,50 @@ def main():
                 "knn_k": cfg["knn_k"],
                 "gce_q": GCE_Q,
                 "prototype_temperature": PROTOTYPE_TEMPERATURE,
+                "ece_num_bins": ECE_BINS,
                 **counts,
                 **metrics,
             }
+            rows = [
+                old for old in rows
+                if (old["noise_type"], int(old["seed"])) != (noise_type, seed)
+            ]
             rows.append(row)
             completed.add((noise_type, seed))
             output_path.parent.mkdir(parents=True, exist_ok=True)
             save_results(rows, output_path)
-            print(f"Accuracy={metrics['accuracy']:.6f}, Macro-F1={metrics['macro_f1']:.6f}")
+            artifact_path = output_path.parent / "artifacts" / name / f"seed_{seed}.pt"
+            save_artifacts(
+                artifacts,
+                metrics,
+                artifact_path,
+                {
+                    "method": METHOD,
+                    "dataset": args.dataset,
+                    "backbone": backbone,
+                    "noise_name": name,
+                    "seed": seed,
+                    "feature_sha256": feature_sha256,
+                    "ece_num_bins": ECE_BINS,
+                },
+            )
+            print(
+                f"Accuracy={metrics['accuracy']:.6f}, Macro-F1={metrics['macro_f1']:.6f}, "
+                f"ECE-Raw={metrics['ece_raw']:.6f}, T={metrics['temperature']:.6f}, "
+                f"ECE-Calibrated={metrics['ece_calibrated']:.6f}"
+            )
 
     runs = pd.DataFrame(rows)
     summary = runs.groupby(["dataset", "noise_name", "backbone"], dropna=False).agg(
         n_runs=("seed", "size"),
         accuracy_mean=("accuracy", "mean"), accuracy_std=("accuracy", "std"),
         macro_f1_mean=("macro_f1", "mean"), macro_f1_std=("macro_f1", "std"),
+        ece_raw_mean=("ece_raw", "mean"), ece_raw_std=("ece_raw", "std"),
+        temperature_mean=("temperature", "mean"), temperature_std=("temperature", "std"),
+        ece_calibrated_mean=("ece_calibrated", "mean"),
+        ece_calibrated_std=("ece_calibrated", "std"),
+        n_calibration_anchors_mean=("n_calibration_anchors", "mean"),
+        n_calibration_anchors_std=("n_calibration_anchors", "std"),
     ).reset_index()
     summary.to_csv(output_path.with_name("summary.csv"), index=False)
     backbone_summary_path = merge_backbone_summaries(output_root)

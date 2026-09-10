@@ -145,14 +145,27 @@ size 256, and 50 epochs. Seeds default to `1, 2, 3`. Human labels and their
 first-stage partition are fixed across classifier seeds; synthetic settings use
 the matching seed's saved labels and partition. Ground-truth training labels are
 never read by the stage-2 trainer. Official clean test labels are used only for
-Accuracy and Macro-F1.
+final Accuracy, Macro-F1, and top-label ECE with 15 equal-width confidence bins.
+
+After Ours finishes training, it performs Reliability-Anchored Temperature
+Calibration without changing the classifier. For each class, candidates are
+predicted-Clean samples whose noisy label and linear-head prediction agree.
+The highest `global_margin` 10% per class are used as anchors; classes with at
+most 10 candidates retain all candidates. A single positive scalar temperature
+is fitted so the anchors' mean maximum confidence approaches `0.995`. This fit
+does not accept clean training labels, a ground-truth noise mask, validation
+labels, or test labels. Temperature scaling changes probabilities only, so
+Accuracy and Macro-F1 are checked to remain exactly unchanged.
 
 Stage-2 results are written locally under
 `outputs/stage2/<backbone>/<dataset>/`. Existing runs are skipped unless
-`--force` is provided. After each run, the five-backbone Accuracy and Macro-F1
-mean/std table is refreshed at
-`outputs/stage2/backbone_comparison/summary.csv`. Detailed training outputs are
-intentionally excluded from version control.
+`--force` is provided. Runs from the previous CSV schema are automatically
+recomputed when their ECE/calibration fields are missing. Each run records
+Accuracy, Macro-F1, raw ECE, temperature, and calibrated ECE; three-seed
+mean/std tables are refreshed at
+`outputs/stage2/backbone_comparison/summary.csv`. Detailed logits,
+probabilities, and anchor indices are saved locally under `artifacts/` and are
+excluded from version control.
 
 ## Results
 
@@ -252,6 +265,8 @@ only for `dinov2_vit_b14`. It validates and reuses the same train/test feature
 caches as Ours, reads original CIFAR targets, and trains `nn.Linear` with the
 same AdamW configuration, initialization, shuffling, epochs, batch size, and
 final-epoch evaluation. It does not load noisy annotations or partitions.
+Clean-LP reports Accuracy, Macro-F1, and raw 15-bin ECE. As a baseline it never
+invokes reliability-anchored calibration.
 
 Run CIFAR-10 and CIFAR-100 separately; the second completed command creates the
 eight-column summary and direct Accuracy comparison with Ours:

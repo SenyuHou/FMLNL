@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from lnl_foundation.backbones.frozen import canonical_backbone_name
 from lnl_foundation.data.datasets import DATASET_META, load_cifar_base
 from lnl_foundation.features import feature_cache_path, load_features
-from lnl_foundation.training import LinearProbeConfig, train_clean_linear_probe
+from lnl_foundation.training import ECE_BINS, LinearProbeConfig, train_clean_linear_probe
 from lnl_foundation.utils import get_device, load_config
 
 
@@ -24,7 +24,8 @@ SETTINGS = ("Human", "Symm0.6", "Pairflip0.3", "Inst0.4")
 RAW_KEY = ["dataset", "backbone", "method", "seed"]
 RAW_COLUMNS = [
     "dataset", "backbone", "method", "seed", "feature_dim", "feature_sha256",
-    "n_train", "n_test", "training_label_source", "accuracy", "macro_f1",
+    "n_train", "n_test", "training_label_source", "ece_num_bins", "accuracy", "macro_f1",
+    "ece_raw",
 ]
 
 
@@ -39,8 +40,13 @@ def load_raw(path):
     if not path.exists():
         return pd.DataFrame(columns=RAW_COLUMNS)
     raw = pd.read_csv(path)
-    if not set(RAW_COLUMNS).issubset(raw.columns):
+    legacy_columns = set(RAW_COLUMNS) - {"ece_num_bins", "ece_raw"}
+    if not legacy_columns.issubset(raw.columns):
         raise ValueError(f"Invalid existing Clean-LP raw file: {path}")
+    if "ece_raw" not in raw:
+        raw["ece_raw"] = np.nan
+    if "ece_num_bins" not in raw:
+        raw["ece_num_bins"] = ECE_BINS
     return raw[RAW_COLUMNS].copy()
 
 
@@ -58,7 +64,8 @@ def build_summary(raw, output_path):
     raw = raw.drop_duplicates(RAW_KEY, keep="last")
     expected = {(dataset, seed) for dataset in DATASETS for seed in SEEDS}
     actual = set(zip(raw["dataset"], raw["seed"].astype(int)))
-    if actual != expected:
+    complete = np.isfinite(raw[["accuracy", "macro_f1", "ece_raw"]].to_numpy(dtype=float)).all()
+    if actual != expected or not complete:
         print("Clean-LP summary is waiting for all CIFAR-10/100 seeds 1, 2, 3.", flush=True)
         return None
 
@@ -67,11 +74,14 @@ def build_summary(raw, output_path):
         accuracy_std=("accuracy", "std"),
         macro_f1_mean=("macro_f1", "mean"),
         macro_f1_std=("macro_f1", "std"),
+        ece_raw_mean=("ece_raw", "mean"),
+        ece_raw_std=("ece_raw", "std"),
     )
     rows = []
     for metric, mean_column, std_column in (
         ("Accuracy", "accuracy_mean", "accuracy_std"),
         ("Macro-F1", "macro_f1_mean", "macro_f1_std"),
+        ("ECE-Raw", "ece_raw_mean", "ece_raw_std"),
     ):
         for statistic, column in (("Mean (%)", mean_column), ("Std (pp)", std_column)):
             row = {"Backbone": BACKBONE, "Method": METHOD, "Metric": metric, "Statistic": statistic}
@@ -209,10 +219,10 @@ def main():
             & (raw["method"] == METHOD)
             & (raw["seed"].astype(int) == seed)
         ]
-        if len(current):
+        if len(current) and np.isfinite(current["ece_raw"].to_numpy(dtype=float)).all():
             print(f"Skipping completed Clean-LP {args.dataset}/seed_{seed}", flush=True)
             continue
-        metrics = train_clean_linear_probe(
+        result = train_clean_linear_probe(
             train_features,
             clean_train_labels,
             test_features,
@@ -222,6 +232,8 @@ def main():
             device,
             config,
         )
+        artifacts = result.pop("_artifacts")
+        metrics = result
         row = {
             "dataset": args.dataset,
             "backbone": backbone,
@@ -232,12 +244,28 @@ def main():
             "n_train": len(train_features),
             "n_test": len(test_features),
             "training_label_source": "clean_ground_truth",
+            "ece_num_bins": ECE_BINS,
             **metrics,
         }
         raw = merge_raw(raw_path, pd.DataFrame([row]))
+        artifact_path = output_root / "artifacts" / args.dataset / f"seed_{seed}.pt"
+        artifact_path.parent.mkdir(parents=True, exist_ok=True)
+        torch.save(
+            {
+                "method": METHOD,
+                "dataset": args.dataset,
+                "backbone": backbone,
+                "seed": seed,
+                "feature_sha256": feature_sha256,
+                "ece_num_bins": ECE_BINS,
+                **metrics,
+                **artifacts,
+            },
+            artifact_path,
+        )
         print(
             f"{args.dataset}/seed_{seed}: Accuracy={metrics['accuracy']:.6f}, "
-            f"Macro-F1={metrics['macro_f1']:.6f}",
+            f"Macro-F1={metrics['macro_f1']:.6f}, ECE-Raw={metrics['ece_raw']:.6f}",
             flush=True,
         )
 

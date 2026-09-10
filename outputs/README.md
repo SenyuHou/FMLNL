@@ -9,11 +9,12 @@ Tracked formal results:
 
 - `generalization/summaries/**`: aggregate first-stage GMM and SimiFeat tables.
 - `generalization/baselines/summaries/**`: compact CLIPCleaner/DeFT run and mean/std tables.
-- `stage2/**/runs.csv`: final robust linear-probe metrics for each seed.
-- `stage2/**/summary.csv`: final robust linear-probe mean/std tables.
+- `stage2/**/runs.csv`: robust linear-probe Accuracy, Macro-F1, raw ECE, temperature, and calibrated ECE per seed.
+- `stage2/**/summary.csv`: corresponding three-seed mean/std tables.
 - `clean_lp/*.csv`: DINOv2 clean-label linear-probe reference tables.
 
-Ignored artifacts include per-sample `partition.csv`, detailed first-stage run
+Ignored artifacts include per-sample `partition.csv`, Stage-2 test logits and
+probabilities under `artifacts/`, detailed first-stage run
 directories, diagnostic experiments, logs, feature caches, and historical
 outputs. Do not force-add these ignored files.
 
@@ -40,13 +41,14 @@ generalization/
 
 stage2/<backbone>/<dataset>/
   runs.csv                 # fixed CE-GCE-SoftCE metrics for each seed
-  summary.csv              # fixed CE-GCE-SoftCE mean/std
+  summary.csv              # Accuracy/Macro-F1/ECE/temperature mean/std
+  artifacts/              # local test logits/probabilities and anchor indices
 stage2/backbone_comparison/
-  summary.csv              # all-backbone Accuracy/Macro-F1 mean/std table
+  summary.csv              # all-backbone Accuracy/Macro-F1/raw+calibrated ECE table
 
 clean_lp/
-  dinov2_clean_lp_raw.csv       # six per-seed Clean-LP runs
-  clean_lp_summary.csv          # eight-column Clean-LP mean/std table
+  dinov2_clean_lp_raw.csv       # six per-seed Clean-LP runs with raw ECE
+  clean_lp_summary.csv          # Accuracy/Macro-F1/raw ECE mean/std table
   dinov2_ours_vs_clean_lp.csv   # eight-setting Accuracy comparison
 ```
 

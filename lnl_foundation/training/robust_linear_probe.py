@@ -2,14 +2,13 @@ from dataclasses import dataclass
 import math
 import warnings
 
-import numpy as np
 import torch
 import torch.nn.functional as F
-from sklearn.metrics import f1_score
 from torch import nn
 from tqdm import tqdm
 
 from lnl_foundation.partition.global_local_gmm import CLEAN, HARD, NOISY
+from lnl_foundation.training.calibration import evaluate_logits, reliability_anchored_temperature
 from lnl_foundation.utils import set_seed
 
 
@@ -23,6 +22,15 @@ class LinearProbeConfig:
     weight_decay: float = 1e-4
     epochs: int = 50
     batch_size: int = 256
+
+
+@torch.no_grad()
+def _collect_logits(classifier, features, batch_size):
+    classifier.eval()
+    return torch.cat([
+        classifier(features[start:start + batch_size]).float().cpu()
+        for start in range(0, len(features), batch_size)
+    ])
 
 
 def build_prototype_targets(features, noisy_labels, partition, num_classes):
@@ -85,6 +93,7 @@ def train_robust_linear_probe(
     seed,
     device,
     config=LinearProbeConfig(),
+    global_margin=None,
 ):
     """Train Clean-CE + Hard-GCE + Noisy-Prototype-SoftCE."""
     if train_features.ndim != 2 or test_features.shape[-1] != train_features.shape[-1]:
@@ -134,17 +143,42 @@ def train_robust_linear_probe(
             num_batches += 1
         progress.set_postfix(loss=f"{epoch_loss / num_batches:.4f}")
 
-    classifier.eval()
-    predictions = []
-    with torch.no_grad():
-        for start in range(0, len(test_features), config.batch_size):
-            predictions.append(
-                classifier(test_features[start : start + config.batch_size]).argmax(dim=1).cpu()
-            )
-    predictions = torch.cat(predictions)
-    accuracy = float((predictions == test_labels).float().mean())
-    macro_f1 = float(f1_score(test_labels.numpy(), predictions.numpy(), average="macro"))
-    return {"accuracy": accuracy, "macro_f1": macro_f1}
+    if global_margin is None:
+        raise ValueError("Ours calibration requires saved first-stage global margins.")
+    train_logits = _collect_logits(classifier, train_features, config.batch_size)
+    test_logits = _collect_logits(classifier, test_features, config.batch_size)
+    calibration = reliability_anchored_temperature(
+        train_logits,
+        noisy_labels.cpu(),
+        partition.cpu(),
+        global_margin,
+        num_classes,
+    )
+    raw = evaluate_logits(test_logits, test_labels, temperature=1.0)
+    calibrated = evaluate_logits(
+        test_logits, test_labels, temperature=calibration["temperature"]
+    )
+    if raw["accuracy"] != calibrated["accuracy"] or raw["macro_f1"] != calibrated["macro_f1"]:
+        raise ValueError("Temperature scaling changed Accuracy or Macro-F1.")
+    return {
+        "accuracy": raw["accuracy"],
+        "macro_f1": raw["macro_f1"],
+        "ece_raw": raw["ece"],
+        "temperature": calibration["temperature"],
+        "ece_calibrated": calibrated["ece"],
+        "n_calibration_anchors": calibration["n_calibration_anchors"],
+        "anchor_mean_confidence": calibration["anchor_mean_confidence"],
+        "anchor_top_fraction": calibration["anchor_top_fraction"],
+        "anchor_target_confidence": calibration["anchor_target_confidence"],
+        "_artifacts": {
+            "test_logits": test_logits,
+            "test_probabilities_raw": raw["probabilities"],
+            "test_probabilities_calibrated": calibrated["probabilities"],
+            "anchor_indices": calibration["anchor_indices"],
+            "anchor_candidate_counts": calibration["anchor_candidate_counts"],
+            "anchor_selected_counts": calibration["anchor_selected_counts"],
+        },
+    }
 
 
 def train_clean_linear_probe(
@@ -199,16 +233,14 @@ def train_clean_linear_probe(
             num_batches += 1
         progress.set_postfix(loss=f"{epoch_loss / num_batches:.4f}")
 
-    classifier.eval()
-    predictions = []
-    with torch.no_grad():
-        for start in range(0, len(test_features), config.batch_size):
-            predictions.append(
-                classifier(test_features[start : start + config.batch_size]).argmax(dim=1).cpu()
-            )
-    predictions = torch.cat(predictions)
-    accuracy = float((predictions == test_labels).float().mean())
-    macro_f1 = float(f1_score(test_labels.numpy(), predictions.numpy(), average="macro"))
-    if not np.isfinite([accuracy, macro_f1]).all():
-        raise ValueError("Clean-LP metrics contain NaN or Inf.")
-    return {"accuracy": accuracy, "macro_f1": macro_f1}
+    test_logits = _collect_logits(classifier, test_features, config.batch_size)
+    raw = evaluate_logits(test_logits, test_labels, temperature=1.0)
+    return {
+        "accuracy": raw["accuracy"],
+        "macro_f1": raw["macro_f1"],
+        "ece_raw": raw["ece"],
+        "_artifacts": {
+            "test_logits": test_logits,
+            "test_probabilities_raw": raw["probabilities"],
+        },
+    }
