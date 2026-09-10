@@ -1,0 +1,2 @@
+dataset,backbone,method,feature_sha256,human_worse_label,instance_0.4,pairflip_0.3,symmetric_0.6
+cifar10,clip_vit_l14,CLIPCleaner,324cdcecef350cd0919f5089804d0503cecbd6eefb3927711811c9cf05922ed4,92.84624481231388,93.90412961879451,84.69253546703821,98.21460859511096
