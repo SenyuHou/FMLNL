@@ -25,6 +25,17 @@
 !/outputs/stage2/**/runs.csv
 !/outputs/stage2/**/summary.csv
 
+# Future Stage-2 baselines: sync compact metrics only
+!/outputs/stage2_baselines/
+/outputs/stage2_baselines/**
+!/outputs/stage2_baselines/**/
+!/outputs/stage2_baselines/**/runs.csv
+!/outputs/stage2_baselines/**/summary.csv
+
+# Standalone ECE reports across Ours and future Stage-2 baselines
+!/outputs/ece/
+!/outputs/ece/*.csv
+
 # Clean-label linear-probe reference: sync only its three compact CSV tables
 !/outputs/clean_lp/
 /outputs/clean_lp/*

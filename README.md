@@ -176,6 +176,23 @@ non-equivalent compatible partitions exist without an exact match, it stops
 with an ambiguity error. Result rows retain both the current feature hash and
 the source partition feature/file hashes for provenance.
 
+### Standalone ECE Reports
+
+Build the ECE-only reports after Stage-2 runs finish:
+
+```bash
+python scripts/summarize_ece.py
+```
+
+The publication-style table is `outputs/ece/ece_table.csv`; per-seed values
+and machine-readable mean/std values are saved as `ece_runs.csv` and
+`ece_summary.csv`. Ours contributes both Raw and Calibrated rows. Future
+Stage-2 baselines are discovered from `outputs/stage2_baselines/**/runs.csv`
+and contribute Raw rows only. A baseline file must contain `method`,
+`backbone`, `dataset`, `noise_name`, `seed`, and `ece_raw`; `ece_num_bins=15`
+is recommended. If a noise-independent reference omits `noise_name`, its ECE
+is replicated across the four settings for that dataset.
+
 ## Results
 
 Each run writes only `metrics.json` and `partition.csv` under:

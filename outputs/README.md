@@ -17,6 +17,8 @@ Tracked formal results:
 - `generalization/baselines/summaries/**`: compact CLIPCleaner/DeFT run and mean/std tables.
 - `stage2/**/runs.csv`: robust linear-probe Accuracy, Macro-F1, raw ECE, temperature, and calibrated ECE per seed.
 - `stage2/**/summary.csv`: corresponding three-seed mean/std tables.
+- `stage2_baselines/**/runs.csv`: future baseline per-seed metrics, including raw ECE.
+- `ece/*.csv`: standalone ECE per-seed, mean/std, and publication-style tables.
 - `clean_lp/*.csv`: DINOv2 clean-label linear-probe reference tables.
 
 Ignored artifacts include per-sample `partition.csv`, Stage-2 test logits and
@@ -51,6 +53,15 @@ stage2/<backbone>/<dataset>/
   artifacts/              # local test logits/probabilities and anchor indices
 stage2/backbone_comparison/
   summary.csv              # all-backbone Accuracy/Macro-F1/raw+calibrated ECE table
+
+stage2_baselines/<method>/<backbone>/<dataset>/
+  runs.csv                 # method/backbone/dataset/noise_name/seed/ece_raw
+  summary.csv              # optional baseline aggregate table
+
+ece/
+  ece_runs.csv             # unified per-seed ECE values and source files
+  ece_summary.csv          # tidy mean/std values on 0-1 and percent scales
+  ece_table.csv            # wide mean +/- std table for reporting
 
 clean_lp/
   dinov2_clean_lp_raw.csv       # six per-seed Clean-LP runs with raw ECE
