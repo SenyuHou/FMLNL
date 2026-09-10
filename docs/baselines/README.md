@@ -5,6 +5,12 @@ same CIFAR sample order and saved noisy labels as the current FMLNL
 Global-Local-GMM/SimiFeat comparison. Clean labels are not passed to either
 detector and are used only by the shared binary evaluation step.
 
+Source partitions do not need to share the evaluated feature hash or backbone.
+The runner validates that all available formal candidates for each
+dataset/noise/seed contain the same noisy-label vector, then prefers an exact
+feature match, the same backbone, or another backbone in that order. The
+evaluated feature hash remains part of every output path and metrics row.
+
 ## CLIPCleaner
 
 The implementation ports `combined_selection` from the original CLIPCleaner

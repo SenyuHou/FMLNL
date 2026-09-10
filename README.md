@@ -273,6 +273,13 @@ Global-Local-GMM runs. Each command runs one method, one dataset, and one CLIP
 backbone over Human, symmetric 0.6, all-class pairflip 0.3, and matrix IDN 0.4
 for seeds 1, 2, and 3.
 
+Noisy-label source partitions are feature-independent. The runner first
+prefers an exact feature match, then the same backbone, then any other formal
+backbone, and verifies that all available candidates have identical noisy-label
+hashes. Baseline outputs remain separated by the evaluated backbone and its
+own feature hash, so local and server feature variants cannot silently replace
+one another.
+
 ```bash
 python scripts/run_stage1_baseline.py --method clipcleaner --dataset cifar10 --backbone clip_vit_b16
 python scripts/run_stage1_baseline.py --method deft --dataset cifar100 --backbone clip_vit_l14

@@ -41,12 +41,11 @@ def expected_settings(dataset, human_noise_type):
 
 def load_source_runs(root, dataset, backbone, feature_sha256, cfg, human_noise_type):
     expected = expected_settings(dataset, human_noise_type)
-    matches = {}
-    for path in sorted((root / dataset / backbone).glob("**/metrics.json")):
+    candidates = {}
+    for path in sorted((root / dataset).glob("*/**/metrics.json")):
         row = json.loads(path.read_text(encoding="utf-8"))
         if (
             row.get("protocol") != SOURCE_PROTOCOL
-            or row.get("feature_sha256") != feature_sha256
             or row.get("tau_global") != cfg["global_posterior_threshold"]
             or row.get("tau_local") != cfg["local_posterior_threshold"]
             or row.get("knn_k") != cfg["knn_k"]
@@ -55,13 +54,38 @@ def load_source_runs(root, dataset, backbone, feature_sha256, cfg, human_noise_t
         ):
             continue
         key = (row["noise_name"], int(row["seed"]))
-        if key in matches:
-            raise ValueError(f"Duplicate formal source partitions for {dataset}/{backbone}/{key}.")
-        matches[key] = (path, row)
+        partition_path = path.with_name("partition.csv")
+        if partition_path.exists():
+            candidates.setdefault(key, []).append((path, row))
     required = {(name, seed) for name in expected for seed in (1, 2, 3)}
-    missing = sorted(required - set(matches))
+    missing = sorted(required - set(candidates))
     if missing:
-        raise ValueError(f"Missing formal Global-Local-GMM source partitions: {missing}")
+        raise ValueError(
+            "Missing formal Global-Local-GMM source partitions for this dataset: "
+            f"{missing}. Partitions may come from any backbone; feature hashes need not match."
+        )
+
+    matches = {}
+    for key in sorted(required):
+        resolved = []
+        for path, row in candidates[key]:
+            frame = pd.read_csv(path.with_name("partition.csv"), usecols=["index", "noisy_label"])
+            frame = frame.sort_values("index")
+            if not np.array_equal(frame["index"].to_numpy(), np.arange(len(frame))):
+                raise ValueError(f"Misaligned source labels: {path.with_name('partition.csv')}")
+            labels = frame["noisy_label"].to_numpy(dtype=np.int64)
+            label_sha256 = hashlib.sha256(labels.tobytes()).hexdigest()
+            resolved.append((path, row, labels, label_sha256))
+        label_hashes = {item[3] for item in resolved}
+        if len(label_hashes) != 1:
+            details = [(str(item[0]), item[3]) for item in resolved]
+            raise ValueError(f"Conflicting noisy labels for {dataset}/{key}: {details}")
+        resolved.sort(key=lambda item: (
+            item[1].get("feature_sha256") != feature_sha256,
+            item[1].get("backbone") != backbone,
+            str(item[0]),
+        ))
+        matches[key] = resolved[0]
     return matches
 
 
@@ -156,12 +180,9 @@ def main():
 
     for noise_name in expected_settings(args.dataset, args.human_noise_type):
         for seed in (1, 2, 3):
-            source_path, source = sources[(noise_name, seed)]
-            frame = pd.read_csv(source_path.with_name("partition.csv")).sort_values("index")
-            if not np.array_equal(frame["index"].to_numpy(), np.arange(len(clean))):
-                raise ValueError(f"Misaligned source labels: {source_path}")
-            labels = frame["noisy_label"].to_numpy(dtype=np.int64)
-            label_sha256 = hashlib.sha256(labels.tobytes()).hexdigest()
+            source_path, source, labels, label_sha256 = sources[(noise_name, seed)]
+            if len(labels) != len(clean):
+                raise ValueError(f"Unexpected source-label count: {source_path.with_name('partition.csv')}")
             destination = variant_root / noise_name / f"seed_{seed}"
             metrics_path = destination / "metrics.json"
             if metrics_path.exists() and not args.force:
@@ -236,6 +257,8 @@ def main():
                 "actual_noise_rate": float(truth.mean()),
                 "feature_sha256": feature_sha256,
                 "noisy_labels_sha256": label_sha256,
+                "source_backbone": source["backbone"],
+                "source_feature_sha256": source["feature_sha256"],
                 "source_partition": str(source_path.with_name("partition.csv").relative_to(generalization_root)),
                 "predicted_clean": int(result["predicted_clean"].sum()),
                 "predicted_noisy": int(predicted_noisy.sum()),
